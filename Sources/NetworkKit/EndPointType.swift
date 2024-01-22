@@ -57,8 +57,11 @@ extension EndpointType {
         }
         
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        for header in headers {
-            request.addValue(header.value, forHTTPHeaderField: header.key)
+        
+        if let headers {
+            for header in headers {
+                request.addValue(header.value, forHTTPHeaderField: header.key)
+            }
         }
         
         return request
