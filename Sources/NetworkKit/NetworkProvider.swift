@@ -33,11 +33,9 @@ final class NetworkProvider: NetworkProviderType {
         let (data, response) = try await session.data(for: request)
         try filterNetworkingError(data: data, response: response)
         
-        guard let decoded = try? JSONDecoder().decode(T.self, from: data) else {
-            throw NetworkError.decodingError
-        }
+        let result = try filterDecodingError(data: data, type: T.self)
         
-        return decoded
+        return result
     }
 }
 
@@ -54,6 +52,20 @@ private extension NetworkProvider {
         
         guard !data.isEmpty else {
             throw NetworkError.emptyData
+        }
+    }
+    
+    func filterDecodingError<T: Decodable>(data: Data, type: T.Type) throws -> T {
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch DecodingError.keyNotFound(let key, _) {
+            throw NetworkError.decodingKeyError(key: key.stringValue)
+        } catch DecodingError.typeMismatch(_, let context) {
+            throw NetworkError.decodingTypeError(keys: context.codingPath)
+        } catch DecodingError.valueNotFound(_, let context) {
+            throw NetworkError.decodingValueError(keys: context.codingPath)
+        } catch {
+            throw NetworkError.unknownError(message: "알 수 없는 오류가 발생했어요")
         }
     }
 }

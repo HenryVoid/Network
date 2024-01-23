@@ -6,7 +6,9 @@ enum NetworkError: LocalizedError {
     case invalidURL
     case invalidStatusCode(code: Int)
     case emptyData
-    case decodingError
+    case decodingKeyError(key: String)
+    case decodingTypeError(keys: [CodingKey])
+    case decodingValueError(keys: [CodingKey])
     case responseError
     case unknownError(message: String)
     
@@ -20,8 +22,14 @@ enum NetworkError: LocalizedError {
             return "나중에 다시 시도해주세요"
         case .emptyData:
             return "유효하지 않은 결과에요"
-        case .decodingError:
-            return "알 수 없는 에러가 발생했어요"
+        case .decodingKeyError(let key):
+            return "DECODE: \(key)를 찾을 수 없어요"
+        case .decodingTypeError(let keys):
+            let text = keys.map { $0.stringValue }.joined(separator: ",")
+            return "(\(text))의 타입을 다시 확인해주세요"
+        case .decodingValueError(let keys):
+            let text = keys.map { $0.stringValue }.joined(separator: ",")
+            return "(\(text))의 값을 다시 확인해주세요"
         case .unknownError(let message):
             return message
         }
