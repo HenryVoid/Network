@@ -20,7 +20,7 @@ final class APIClient: APIProtocol {
         return Session(configuration: configuration, eventMonitors: [APILogger()])
     }
     
-    func request<T: Decodable>(_ endpoint: Router, decode: T.Type) async throws -> T {
+    func request<T: Decodable>(_ endpoint: Endpoint, decode: T.Type) async throws -> T {
         do {
             let result = try await self.session.request(endpoint.asURLRequest()).serializingData().response
             return try self.manageResponse(data: result.data, response: result.response)
