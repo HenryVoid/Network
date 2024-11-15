@@ -8,10 +8,24 @@
 import Foundation
 import Alamofire
 
-final class APIInterceptor: RequestAdapter, RequestRetrier {
+public protocol TokenRefreshable: Sendable {
+    func readToken() -> String?
+    func refreshToken() async -> Bool
+}
+
+@available(macOS 10.15, *)
+final class APIInterceptor: RequestInterceptor {
+    
+    private let tokenRefresher: TokenRefreshable
+    
+    init(tokenRefresher: TokenRefreshable) {
+        self.tokenRefresher = tokenRefresher
+    }
+    
     func adapt(_ urlRequest: URLRequest, for session: Alamofire.Session, completion: @escaping (Result<URLRequest, any Error>) -> Void) {
         var request = urlRequest
-        guard let token = UserDefaults.value(forKey: "token") as? String else { // Get token
+        
+        guard let token = tokenRefresher.readToken(), !token.isEmpty else { // Get token
             completion(.success(request))
             return
         }
@@ -34,20 +48,8 @@ final class APIInterceptor: RequestAdapter, RequestRetrier {
         print("\nretried; retry count: \(request.retryCount)\n")
         
         Task {
-            let getRefreshToken = await self.refreshToken()
+            let getRefreshToken = await self.tokenRefresher.refreshToken()
             getRefreshToken ? completion(.retry) : completion(.doNotRetry)
         }
-    }
-}
-
-extension APIIntercepter {
-    func refreshToken() async -> Bool {
-        // TODO: RefreshToken API 호출
-        let result = try? await APIClient().request(Common.Endpoint.refreshToken, decode: Common.Response).serializingData().response
-        
-        // TODO: Save RefreshToken to (UserDefaults)
-        
-        
-        return result == true
     }
 }
