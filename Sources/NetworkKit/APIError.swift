@@ -8,7 +8,6 @@
 import Foundation
 
 public struct APIError: Error {
-
     var statusCode: Int
     let errorCode: String
     var message: String
@@ -17,11 +16,6 @@ public struct APIError: Error {
         self.statusCode = statusCode
         self.errorCode = errorCode
         self.message = message
-    }
-
-    var errorCodeNumber: String {
-        let numberString = errorCode.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
-        return numberString
     }
 
     private enum CodingKeys: String, CodingKey {

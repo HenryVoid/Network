@@ -8,16 +8,13 @@
 import Foundation
 import Alamofire
 
+@available(macOS 10.15, *)
 final class APIClient: APIProtocol {
     
-    public init() {}
+    private let session: Session
     
-    private var session: Session {
-        let configuration = URLSessionConfiguration.af.default
-        configuration.waitsForConnectivity = true
-        configuration.timeoutIntervalForRequest = 60 // seconds that a task will wait for data to arrive
-        configuration.timeoutIntervalForResource = 300 // seconds for whole resource request to complete ,.
-        return Session(configuration: configuration, eventMonitors: [APILogger()])
+    public init(session: Session) {
+        self.session = Session(configuration: session.sessionConfiguration, eventMonitors: [APILogger()])
     }
     
     func request<T: Decodable>(_ endpoint: Endpoint, decode: T.Type) async throws -> T {
@@ -33,8 +30,27 @@ final class APIClient: APIProtocol {
             )
         }
     }
+    
+    public func upload<T>(_ endpoint: any Endpoint, decode: T.Type) async throws -> T where T : Decodable {
+        do {
+            let result = try await self.session.upload(multipartFormData: { multipartFormData in
+                if let data = endpoint.body?["data"] as? Data {
+                    multipartFormData.append(data, withName: "image")
+                }
+            }, with: endpoint.asURLRequest()).serializingData(automaticallyCancelling: true).response
+            return try self.manageResponse(data: result.data, response: result.response)
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError(
+                errorCode: "ERROR",
+                message: "Unknown API error \(error.localizedDescription)"
+            )
+        }
+    }
 }
 
+@available(macOS 10.15, *)
 extension APIClient {
     // MARK: Private
     
