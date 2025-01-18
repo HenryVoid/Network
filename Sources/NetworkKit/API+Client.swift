@@ -1,96 +1,102 @@
-//
-//  APIClient.swift
-//  
-//
-//  Created by 송형욱 on 4/5/24.
-//
-
 import Foundation
 
-@available(macOS 10.15, *)
-final class API+Client: APIProtocol {
-    
-    private let session: Session
-    
-    public init(session: Session) {
-        self.session = Session(configuration: session.sessionConfiguration, eventMonitors: [APILogger()])
-    }
-    
-    func request<T: Decodable>(_ endpoint: Endpoint, decode: T.Type) async throws -> T {
-        do {
-            let result = try await self.session.request(endpoint.asURLRequest()).serializingData().response
-            return try self.manageResponse(data: result.data, response: result.response)
-        } catch let error as APIError {
-            throw error
-        } catch {
-            throw APIError(
-                errorCode: "ERROR",
-                message: "Unknown API error \(error.localizedDescription)"
-            )
+#if !os(macOS)
+extension API {
+    public final class Client: API.Protocol {
+        private let session: any API.Session
+        private let monitor: (any API.Monitorable)?
+        private let logger: (any API.Loggable)?
+        private let interceptors: [API.Interceptor]
+        
+        public init(
+            session: any API.Session,
+            monitor: (any API.Monitorable)? = .shared,
+            logger: (any API.Loggable)? = .shared,
+            interceptors: [API.Interceptor]
+        ) {
+            self.session = session
+            self.monitor = monitor
+            self.logger = logger
+            self.interceptors = interceptors
         }
-    }
-    
-    public func upload<T>(_ endpoint: any Endpoint, decode: T.Type) async throws -> T where T : Decodable {
-        do {
-            let result = try await self.session.upload(multipartFormData: { multipartFormData in
-                if let data = endpoint.body?["data"] as? Data {
-                    multipartFormData.append(data, withName: "image")
-                }
-            }, with: endpoint.asURLRequest()).serializingData(automaticallyCancelling: true).response
-            return try self.manageResponse(data: result.data, response: result.response)
-        } catch let error as APIError {
-            throw error
-        } catch {
-            throw APIError(
-                errorCode: "ERROR",
-                message: "Unknown API error \(error.localizedDescription)"
-            )
+        
+        @MainActor
+        public func request<T: Decodable>(_ endpoint: API.Endpoint, decode: T.Type) async throws -> T {
+            do {
+                let urlRequest = URLRequest = try await
+                logger?.request(urlRequest)
+                return try self.manageResponse(data: result.data, response: result.response)
+            } catch {
+                
+            }
+        }
+        
+        public func upload<T>(_ endpoint: any Endpoint, decode: T.Type) async throws -> T where T : Decodable {
+            do {
+                let result = try await self.session.upload(multipartFormData: { multipartFormData in
+                    if let data = endpoint.body?["data"] as? Data {
+                        multipartFormData.append(data, withName: "image")
+                    }
+                }, with: endpoint.asURLRequest()).serializingData(automaticallyCancelling: true).response
+                return try self.manageResponse(data: result.data, response: result.response)
+            } catch let error as APIError {
+                throw error
+            } catch {
+                throw APIError(
+                    errorCode: "ERROR",
+                    message: "Unknown API error \(error.localizedDescription)"
+                )
+            }
         }
     }
 }
 
-@available(macOS 10.15, *)
-extension APIClient {
+extension API.Client {
     // MARK: Private
     
-    private func manageResponse<T: Decodable>(data: Data?, response: HTTPURLResponse?) throws -> T {
-        guard let response else {
-            throw APIError(
-                errorCode: "ERROR",
-                message: "Invalid HTTP response"
-            )
+    private func adaptInterceptor(_ endpoint: API.Endpoint) async throws(API.Error) -> URLRequest {
+        var urlRequest: URLRequest = try endpoint.asURLRequest()
+        interceptors.forEach {
+            urlRequest = try await $0.adapt(urlRequest: urlRequest)
         }
-        guard let data else {
-            throw APIError(
-                errorCode: "ERROR",
-                message: "Unknown Data Response"
-            )
+        return urlRequest
+    }
+    
+    private func fetch(with urlRequest: URLRequest) async throws(API.Error.Session) -> API.Response {
+        do {
+            let (data, urlResponse) = try await session.data(for: urlRequest)
+            let response: API.Response = API.Response(data: data, response: urlResponse)
+            return response
         }
-        switch response.statusCode {
-        case 200...299:
-            do {
-                return try JSONDecoder().decode(T.self, from: data)
-            } catch {
-                debugPrint("‼️", error)
-                throw APIError(
-                    errorCode: "Decoding Data Error Code",
-                    message: "Error decoding data"
-                )
-            }
-        default:
-            guard let decodedError = try? JSONDecoder().decode(APIError.self, from: data) else {
-                throw APIError(
-                    statusCode: response.statusCode,
-                    errorCode: "ERROR",
-                    message: "Unknown backend error"
-                )
-            }
-            
-            throw APIError(
-                statusCode: response.statusCode,
-                errorCode: decodedError.errorCode,
-                message: decodedError.message
-            )
+        catch {
+            throw .failedDataRequest
+        }
+    }
+    
+    private func validate(_ response: Response) throws(API.Error.Response) {
+        guard let httpResponse = response.response as? HTTPURLResponse else {
+            throw .invalidResponse
+        }
+        
+        guard (200..<300) ~= httpResponse.statusCode else {
+            throw .invalidStatusCode(httpResponse.statusCode)
+        }
+    }
+    
+    private func decode<Model: Decodable>(
+        _ response: Response,
+        with decoder: JSONDecoder
+    ) throws(API.Error.Decoding) -> Model {
+        do {
+            let model = try decoder.decode(Model.self, from: response.data)
+            return model
+        }
+        catch let error as Swift.DecodingError {
+            throw .failedToDecode(error)
+        }
+        catch {
+            throw .unknown
         }
     }
 }
+#endif

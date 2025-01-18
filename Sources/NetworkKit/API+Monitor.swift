@@ -1,6 +1,7 @@
 import Foundation
 import Network
 
+#if !os(macOS)
 extension API {
     protocol Monitorable {
         func connect()
@@ -8,6 +9,7 @@ extension API {
     }
     
     struct Monitor {
+        private let queue: DispatchQueue = .init(label: "API.Monitor")
         private let monitor: NWPathMonitor = .init()
         public private(set) var isConnected: Bool = false
         
@@ -31,3 +33,4 @@ extension API.Monitor: API.Monitorable {
         monitor.cancel()
     }
 }
+#endif

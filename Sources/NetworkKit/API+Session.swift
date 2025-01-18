@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  NetworkKit
-//
-//  Created by 송형욱 on 1/18/25.
-//
-
 import Foundation
 
 #if !os(macOS)
