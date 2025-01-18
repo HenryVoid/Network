@@ -1,5 +1,6 @@
 import Foundation
 
+#if !os(macOS)
 extension API {
     protocol Loggable {
         func request(_ request: URLRequest)
@@ -21,12 +22,12 @@ extension API.Logger: API.Loggable {
         print(request.description)
         
         print(
-            "URL:" + (request.request?.url?.absoluteString ?? "")  + "\n"
-            + "Method:" + (request.request?.httpMethod ?? "") + "\n"
-            + "Headers:" + "\(request.request?.allHTTPHeaderFields ?? [:])" + "\n"
+            "URL:" + (request?.url?.absoluteString ?? "")  + "\n"
+            + "Method:" + (request?.httpMethod ?? "") + "\n"
+            + "Headers:" + "\(request?.allHTTPHeaderFields ?? [:])" + "\n"
         )
-        print("Authorization:" + (request.request?.headers["Authorization"] ?? "nil"))
-        print("Body:" + (request.request?.httpBody?.prettyJson ?? "nil"))
+        print("Authorization:" + (request?.headers["Authorization"] ?? "nil"))
+        print("Body:" + (request?.httpBody?.prettyJson ?? "nil"))
         #endif
     }
     
@@ -34,7 +35,7 @@ extension API.Logger: API.Loggable {
         print("✅ NETWORK Response LOG")
         print(payload())
         print(
-          "URL: " + (request.request?.url?.absoluteString ?? "nil") + "\n"
+          "URL: " + (request?.url?.absoluteString ?? "nil") + "\n"
             + "Result: " + "\(response.result)" + "\n"
             + "StatusCode: " + "\(response.response?.statusCode ?? 0)" + "\n"
             + "Data: \(response.data?.prettyJson ?? "nil")"
@@ -73,3 +74,4 @@ fileprivate extension Data {
         return prettyPrintedString
     }
 }
+#endif

@@ -6,10 +6,9 @@
 //
 
 import Foundation
-import Alamofire
 
 @available(macOS 10.15, *)
-final class APIClient: APIProtocol {
+final class API+Client: APIProtocol {
     
     private let session: Session
     
