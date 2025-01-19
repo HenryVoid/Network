@@ -23,5 +23,6 @@ let package = Package(
             name: "NetworkTests",
             dependencies: ["NetworkKit"]
         ),
-    ]
+    ],
+    swiftLanguageVersions: [.version("6")]
 )

@@ -2,11 +2,11 @@ import Foundation
 
 extension API {
     public enum RetryResult {
-      case retry
-      case doNotRetry(with: Error)
+        case retry
+        case doNotRetry(with: Swift.Error)
     }
     
-    protocol Interceptor {
+    public protocol Interceptor: Sendable {
         func adapt(urlRequest: URLRequest) async throws(API.Error) -> URLRequest
         func retry(
             urlRequest: URLRequest,

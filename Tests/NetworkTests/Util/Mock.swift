@@ -1,47 +1,49 @@
 import Foundation
-@testable import Network
+@testable import NetworkKit
 
-#if !os(macOS)
-struct MockNetworkSession: API.Session {
-    var dataHandler: (URLRequest) async throws -> (Data, URLResponse)
-    
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await dataHandler(request)
-    }
-}
-
-struct MockResponse: Decodable {
-    let response: String
-}
-
-struct MockEndpoint: URLRequestConfigurable {
-    var url: URLConvertible = "https://www.naver.com"
-    var path: String? = nil
-    var method: HTTPMethod = .get
-    var parameters: Parameters? = nil
-    var headers: [Header]? = nil
-    var encoder: ParameterEncodable = URLParameterEncoder()
-}
-
-struct MockInterceptor: Interceptor {
-    var adaptHandler: (URLRequest) async throws(Errors) -> URLRequest = { urlRequest in
-        return urlRequest
-    }
-    var retryHandler: (URLRequest, URLResponse?, Data?, any Error) async -> (URLRequest, RetryResult) = { urlRequest, _, _, error in
-        return (urlRequest, .doNotRetry(with: error))
+@available(iOS 17.0, *)
+enum Mock {
+    struct Session: API.Session, @unchecked Sendable {
+        var dataHandler: (URLRequest) async throws -> (Data, URLResponse)
+        
+        func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+            try await dataHandler(request)
+        }
     }
     
-    func adapt(urlRequest: URLRequest) async throws(Errors) -> URLRequest {
-        return try await adaptHandler(urlRequest)
+    struct Response: Decodable {
+        let response: String
     }
     
-    func retry(
-        urlRequest: URLRequest,
-        response: URLResponse?,
-        data: Data?,
-        with error: any Error
-    ) async -> (URLRequest, RetryResult) {
-        return await retryHandler(urlRequest, response, data, error)
+    struct Endpoint: API.Endpoint {
+        var baseURL: URLConvertible = "https://www.naver.com"
+        var path: String? = nil
+        var method: API.HTTPMethod = .get
+        var parameters: API.Parameters? = nil
+        var headers: API.HttpHeaders? = nil
+        var encoder: API.ParameterEncodable = API.URLParameterEncoder()
+    }
+    
+    struct Interceptor: API.Interceptor, @unchecked Sendable {
+        var adaptHandler: (URLRequest) async throws(API.Error) -> URLRequest = { urlRequest in
+            return urlRequest
+        }
+        var retryHandler: (URLRequest, URLResponse?, Data?, any Error) async -> (URLRequest, API.RetryResult) = { urlRequest, _, _, error in
+            return (urlRequest, .doNotRetry(with: error))
+        }
+        
+        func adapt(urlRequest: URLRequest) async throws(API.Error) -> URLRequest {
+            return try await adaptHandler(urlRequest)
+        }
+        
+        func retry(
+            urlRequest: URLRequest,
+            response: URLResponse?,
+            data: Data?,
+            with error: any Error
+        ) async -> (URLRequest, API.RetryResult) {
+            return await retryHandler(urlRequest, response, data, error)
+        }
     }
 }
 
@@ -54,4 +56,3 @@ extension Data {
         try JSONSerialization.jsonObject(with: self, options: .allowFragments)
     }
 }
-#endif

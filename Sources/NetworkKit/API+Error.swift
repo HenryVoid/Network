@@ -33,7 +33,7 @@ extension API.Error {
     }
     
     public enum Response: Swift.Error, Sendable {
-        case server
+        case server(API.Error.ServerError)
         case invalidResponse
         case invalidStatusCode(Int)
     }
@@ -43,11 +43,11 @@ extension API.Error {
     }
     
     public struct ServerError: Swift.Error, Sendable {
-        var statusCode: Int
-        let errorCode: String
-        var message: String
+        public let statusCode: Int
+        public let errorCode: String
+        public let message: String
         
-        init(statusCode: Int = 0, errorCode: String, message: String) {
+        public init(statusCode: Int = 0, errorCode: String, message: String) {
             self.statusCode = statusCode
             self.errorCode = errorCode
             self.message = message

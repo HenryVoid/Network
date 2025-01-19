@@ -1,7 +1,7 @@
 import Foundation
 
 extension API {
-    public protocol ParameterEncodable {
+    public protocol ParameterEncodable: Sendable {
         func encode(
             request: URLRequest,
             with parameters: API.Parameters?

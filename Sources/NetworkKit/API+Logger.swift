@@ -1,48 +1,43 @@
 import Foundation
 
-#if !os(macOS)
+@available(iOS 17.0, *)
 extension API {
-    protocol Loggable {
+    public protocol Loggable: Sendable {
         func request(_ request: URLRequest)
-        func response(_ request: URLRequest, data: Data, response: URLResponse)
-        func response(_ request: URLRequest, error: API.Error)
+        func response(response: API.Response)
+        func response(error: Swift.Error)
     }
     
-    struct Logger {
-        static let shared: Logger = .init()
+    public struct Logger: Sendable {
+        public static let shared: Logger = .init()
     }
 }
 
+@available(iOS 17.0, *)
 extension API.Logger: API.Loggable {
     
-    func request(_ request: URLRequest) {
+    public func request(_ request: URLRequest) {
         #if DEBUG
         print("🚀 NETWORK Reqeust LOG")
         print(payload())
         print(request.description)
         
-        print(
-            "URL:" + (request?.url?.absoluteString ?? "")  + "\n"
-            + "Method:" + (request?.httpMethod ?? "") + "\n"
-            + "Headers:" + "\(request?.allHTTPHeaderFields ?? [:])" + "\n"
-        )
-        print("Authorization:" + (request?.headers["Authorization"] ?? "nil"))
-        print("Body:" + (request?.httpBody?.prettyJson ?? "nil"))
+        print("URL:", request.url?.absoluteString ?? "")
+        print("Method:", request.httpMethod ?? "")
+        print("Headers:", request.allHTTPHeaderFields ?? [:])
+        print("Authorization:" + (request.allHTTPHeaderFields?["Authorization"] ?? "nil"))
+        print("Body:" + (request.httpBody?.prettyJson ?? "nil"))
         #endif
     }
     
-    func response(_ request: URLRequest, data: Data, response: URLResponse) {
+    public func response(response: API.Response) {
         print("✅ NETWORK Response LOG")
         print(payload())
-        print(
-          "URL: " + (request?.url?.absoluteString ?? "nil") + "\n"
-            + "Result: " + "\(response.result)" + "\n"
-            + "StatusCode: " + "\(response.response?.statusCode ?? 0)" + "\n"
-            + "Data: \(response.data?.prettyJson ?? "nil")"
-        )
+        print("StatusCode:", response.response.statusCode() ?? 0)
+        print("Data:", response.data.prettyJson ?? "nil")
     }
     
-    func response(_ request: URLRequest, error: API.Error) {
+    public func response(error: Swift.Error) {
         print("❌ NETWORK Response Error LOG")
         print(payload())
         print("Error:", error)
@@ -74,4 +69,3 @@ fileprivate extension Data {
         return prettyPrintedString
     }
 }
-#endif

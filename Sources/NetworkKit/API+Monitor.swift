@@ -1,36 +1,38 @@
 import Foundation
 import Network
 
-#if !os(macOS)
+@available(iOS 17.0, *)
 extension API {
-    protocol Monitorable {
+    public protocol Monitorable: Sendable {
         func connect()
+        func isConnected() async -> Bool
         func cancel()
     }
     
-    struct Monitor {
+    public struct Monitor: API.Monitorable, Sendable {
+        public static let shared: Monitor = .init()
         private let queue: DispatchQueue = .init(label: "API.Monitor")
         private let monitor: NWPathMonitor = .init()
-        public private(set) var isConnected: Bool = false
-        
-        init() { start() }
-        
-        deinit { cancel() }
     }
 }
 
-extension API.Monitor: API.Monitorable {
-    private func start() {
+@available(iOS 17.0, *)
+extension API.Monitor {
+    public func connect() {
         monitor.start(queue: queue)
-        
-        monitor.pathUpdateHandler = { path in
-            // 네트워크 사용 가능 여부
-            self.isConnected = path.status == .satisfied
-        }
     }
     
-    private func cancel() {
+    public func isConnected() async -> Bool {
+        return await withCheckedContinuation { continuation in
+            monitor.pathUpdateHandler = { path in
+                // 네트워크 사용 가능 여부
+                continuation.resume(returning: path.status == .satisfied)
+            }
+        }
+        
+    }
+    
+    public func cancel() {
         monitor.cancel()
     }
 }
-#endif

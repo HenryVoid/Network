@@ -1,8 +1,8 @@
 import Foundation
 
-#if !os(macOS)
+@available(iOS 17.0, *)
 extension API {
-    public protocol Endpoint {
+    public protocol Endpoint: Sendable {
         var baseURL: any URLConvertible { get }
         var path: String? { get }
         var method: API.HTTPMethod { get }
@@ -13,6 +13,7 @@ extension API {
     }
 }
 
+@available(iOS 17.0, *)
 extension API.Endpoint {
     public func asURLRequest() throws(API.Error) -> URLRequest {
         do {
@@ -40,4 +41,3 @@ extension API.Endpoint {
         }
     }
 }
-#endif

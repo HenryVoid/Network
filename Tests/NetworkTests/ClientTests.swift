@@ -1,152 +1,105 @@
-import XCTest
-import Network
+import Testing
+import Foundation
+
+@testable import NetworkKit
 
 #if !os(macOS)
-final class ClinetTests: XCTestCase {
-    private var sut: API.Client!
+@MainActor
+struct ClientTests {
     
-    private var testURLString = "https://www.test.com"
-    private lazy var testURL = URL(string: testURLString)!
-    private var testData = "test data".data(using: .utf8)!
-    private lazy var testSuccessResponse = HTTPURLResponse(url: testURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
-    private lazy var testErrorResponse = HTTPURLResponse(url: testURL, statusCode: 500, httpVersion: nil, headerFields: nil)!
-    
-    override func setUp() async throws {
-        try await super.setUp()
-    }
-    
-    override func tearDown() async throws {
-        try await super.tearDown()
-        sut = .none
-    }
-    
-    // MARK: makeURLRequest
-    
-    func test_URL이_유효하지않아_실패한경우() async throws {
-        let data = testData
-        let response = testSuccessResponse
-        let mockNetwork: NetworkSession = MockNetworkSession { urlRequest in
+    @Test
+    func URL_유효성검사_실패() async throws {
+        let url: URL = .init(string: "https://www.test.com")!
+        let data: Data = "test".data(using: .utf8)!
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let session: API.Session = Mock.Session { _ in
             return (data, response)
         }
-        let invalidURLString: String = ""
-        sut = .init(
-            session: mockNetwork,
-            endpoint: MockEndpoint(url: invalidURLString),
+        let client: API.Client = .init(
+            session: session,
+            monitor: nil,
             interceptors: []
         )
+        let endpoint = Mock.Endpoint(baseURL: "")
         
-        do {
-            let _: MockResponse = try await sut.response()
-            XCTFail("this test should throw")
-        }
-        catch {
-            guard
-                case let .configuration(configurationError) = error,
-                case let .invalidURL(urlConvertible) = configurationError,
-                let urlString = urlConvertible as? String
-            else { XCTFail();return }
-            
-            XCTAssertEqual(urlString, invalidURLString)
+        await #expect(throws: API.Error.self) { // Configuration.invalidURL
+            _ = try await client.request(endpoint, decode: Mock.Response.self)
         }
     }
     
-    func test_data를_가져올때_에러를_맞을_경우() async throws {
-        let mockNetwork = MockNetworkSession { _ in
-            throw NSError(domain: "123", code: 123)
+    @Test
+    func Data_가져오기_실패() async throws {
+        let session: API.Session = Mock.Session { _ in
+            throw NSError(domain: "1", code: 1)
         }
-        
-        sut = .init(
-            session: mockNetwork,
-            endpoint: MockEndpoint(),
+        let client: API.Client = .init(
+            session: session,
+            monitor: nil,
             interceptors: []
         )
+        let endpoint = Mock.Endpoint()
         
-        do {
-            let _: MockResponse = try await sut.response()
-            XCTFail("this test should throw")
-        }
-        catch {
-            guard
-                case let .session(sessionError) = error,
-                case .dataRequestFailed = sessionError
-            else {
-                XCTFail(); return
-            }
+        await #expect(throws: API.Error.self) { // Session.failedDataRequest
+            _ = try await client.request(endpoint, decode: Mock.Response.self)
         }
     }
     
-    // MARK: Decode
-    
-    func test_DecodingError를_맞아서_실패할경우() async throws {
-        let response = testSuccessResponse
-        let mockNetwork: NetworkSession = MockNetworkSession { urlRequest in
-            let data = "some invalid format of data".data(using: .utf8)!
+    @Test
+    func decode_실패() async throws {
+        let url: URL = .init(string: "https://www.test.com")!
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let session: API.Session = Mock.Session { _ in
+            let data = "invalid format".data(using: .utf8)!
             return (data, response)
         }
-        sut = .init(
-            session: mockNetwork,
-            endpoint: MockEndpoint(),
+        let client: API.Client = .init(
+            session: session,
+            monitor: nil,
             interceptors: []
         )
+        let endpoint = Mock.Endpoint()
         
-        do {
-            let _: MockResponse = try await sut.response()
-            XCTFail("this test should throw")
-        }
-        catch {
-            guard
-                case let .decoding(decodingError) = error,
-                case let .failedToDecode(decodingError) = decodingError,
-                case .dataCorrupted = decodingError
-            else { XCTFail();return }
+        await #expect(throws: API.Error.self) { // Decoding.failedToDecode
+            _ = try await client.request(endpoint, decode: Mock.Response.self)
         }
     }
     
-    // MARK: Validate
-    
-    func test_statusCode가_유효하지_않은경우() async throws  {
-        let data = testData
-        let response = testErrorResponse
-        let mockNetwork = MockNetworkSession(dataHandler: { _ in (data, response) })
-        sut = .init(
-            session: mockNetwork,
-            endpoint: MockEndpoint(),
+    @Test
+    func statusCode_유효성검사_실패() async throws {
+        let url: URL = .init(string: "https://www.test.com")!
+        let data: Data = "test".data(using: .utf8)!
+        let response = HTTPURLResponse(url: url, statusCode: 500, httpVersion: nil, headerFields: nil)!
+        let session: API.Session = Mock.Session { _ in
+            (data, response)
+        }
+        let client: API.Client = .init(
+            session: session,
+            monitor: nil,
             interceptors: []
         )
+        let endpoint = Mock.Endpoint()
         
-        do {
-            let _: MockResponse = try await sut.response()
-            XCTFail("this test should throw")
-        }
-        catch {
-            guard
-                case let .response(responseError) = error,
-                case let .invalidStatusCode(statusCode) = responseError
-            else { XCTFail(); return }
-            
-            XCTAssertEqual(statusCode, testErrorResponse.statusCode)
+        await #expect(throws: API.Error.self) { // Response.invalidStatusCode
+            _ = try await client.request(endpoint, decode: Mock.Response.self)
         }
     }
     
-    func test_response가_유효하지_않은경우() async throws  {
-        let data = testData
+    @Test
+    func response_실패() async throws {
+        let data: Data = "test".data(using: .utf8)!
         let response = URLResponse()
-        let mockNetwork = MockNetworkSession(dataHandler: { _ in (data, response) })
-        sut = .init(
-            session: mockNetwork,
-            endpoint: MockEndpoint(),
+        let session: API.Session = Mock.Session { _ in
+            (data, response)
+        }
+        let client: API.Client = .init(
+            session: session,
+            monitor: nil,
             interceptors: []
         )
+        let endpoint = Mock.Endpoint()
         
-        do {
-            let _: MockResponse = try await sut.response()
-            XCTFail("this test should throw")
-        }
-        catch {
-            guard
-                case let .response(responseError) = error,
-                case .invalidResponse = responseError
-            else { XCTFail();return }
+        await #expect(throws: API.Error.self) { // Response.invalidResponse
+            _ = try await client.request(endpoint, decode: Mock.Response.self)
         }
     }
 }

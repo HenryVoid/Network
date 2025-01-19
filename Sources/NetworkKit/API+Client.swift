@@ -1,8 +1,8 @@
 import Foundation
 
-#if !os(macOS)
+@available(iOS 17.0, *)
 extension API {
-    public final class Client: API.Protocol {
+    public final class Client: Sendable {
         private let session: any API.Session
         private let monitor: (any API.Monitorable)?
         private let logger: (any API.Loggable)?
@@ -10,8 +10,8 @@ extension API {
         
         public init(
             session: any API.Session,
-            monitor: (any API.Monitorable)? = .shared,
-            logger: (any API.Loggable)? = .shared,
+            monitor: (any API.Monitorable)? = API.Monitor.shared,
+            logger: (any API.Loggable)? = API.Logger.shared,
             interceptors: [API.Interceptor]
         ) {
             self.session = session
@@ -21,43 +21,40 @@ extension API {
         }
         
         @MainActor
-        public func request<T: Decodable>(_ endpoint: API.Endpoint, decode: T.Type) async throws -> T {
+        public func request<T: Decodable>(_ endpoint: API.Endpoint, decode: T.Type) async throws(API.Error) -> T {
             do {
-                let urlRequest = URLRequest = try await
+                if let monitor,
+                   await !monitor.isConnected() {
+                    throw API.Error.connection(.failed)
+                }
+                let urlRequest: URLRequest = try await makeURLRequest(endpoint)
                 logger?.request(urlRequest)
-                return try self.manageResponse(data: result.data, response: result.response)
+                let response: API.Response = try await fetch(with: urlRequest)
+                logger?.response(response: response)
+                return try makeResult(response)
+            } catch let error as API.Error {
+                logger?.response(error: error)
+                throw error
             } catch {
-                
+                logger?.response(error: error)
+                throw .unknown
             }
         }
         
-        public func upload<T>(_ endpoint: any Endpoint, decode: T.Type) async throws -> T where T : Decodable {
-            do {
-                let result = try await self.session.upload(multipartFormData: { multipartFormData in
-                    if let data = endpoint.body?["data"] as? Data {
-                        multipartFormData.append(data, withName: "image")
-                    }
-                }, with: endpoint.asURLRequest()).serializingData(automaticallyCancelling: true).response
-                return try self.manageResponse(data: result.data, response: result.response)
-            } catch let error as APIError {
-                throw error
-            } catch {
-                throw APIError(
-                    errorCode: "ERROR",
-                    message: "Unknown API error \(error.localizedDescription)"
-                )
-            }
-        }
+//        public func upload<T>(_ endpoint: any Endpoint, decode: T.Type) async throws -> T where T : Decodable {
+//
+//        }
     }
 }
 
+@available(iOS 17.0, *)
 extension API.Client {
     // MARK: Private
     
-    private func adaptInterceptor(_ endpoint: API.Endpoint) async throws(API.Error) -> URLRequest {
+    private func makeURLRequest(_ endpoint: API.Endpoint) async throws(API.Error) -> URLRequest {
         var urlRequest: URLRequest = try endpoint.asURLRequest()
-        interceptors.forEach {
-            urlRequest = try await $0.adapt(urlRequest: urlRequest)
+        for interceptor in interceptors {
+          urlRequest = try await interceptor.adapt(urlRequest: urlRequest)
         }
         return urlRequest
     }
@@ -73,30 +70,32 @@ extension API.Client {
         }
     }
     
-    private func validate(_ response: Response) throws(API.Error.Response) {
+    private func makeResult<T: Decodable>(_ response: API.Response) throws(API.Error) -> T {
         guard let httpResponse = response.response as? HTTPURLResponse else {
-            throw .invalidResponse
+            throw .response(.invalidResponse)
         }
         
-        guard (200..<300) ~= httpResponse.statusCode else {
-            throw .invalidStatusCode(httpResponse.statusCode)
+        switch httpResponse.statusCode {
+        case 200..<300:
+            return try decode(response.data, type: T.self)
+        default:
+            guard let serverError = try? decode(response.data, type: API.Error.ServerError.self) else {
+                throw .response(.invalidStatusCode(httpResponse.statusCode))
+            }
+            throw .response(.server(serverError))
         }
     }
     
-    private func decode<Model: Decodable>(
-        _ response: Response,
-        with decoder: JSONDecoder
-    ) throws(API.Error.Decoding) -> Model {
+    private func decode<T: Decodable>(_ data: Data, type decode: T.Type) throws(API.Error) -> T {
         do {
-            let model = try decoder.decode(Model.self, from: response.data)
+            let model = try JSONDecoder().decode(T.self, from: data)
             return model
         }
         catch let error as Swift.DecodingError {
-            throw .failedToDecode(error)
+            throw .decoding(.failedToDecode(error))
         }
         catch {
             throw .unknown
         }
     }
 }
-#endif
