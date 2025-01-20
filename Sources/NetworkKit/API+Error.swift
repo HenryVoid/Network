@@ -20,7 +20,7 @@ extension API.Error {
     }
     
     public enum Configuration: Swift.Error, Sendable {
-        case invalidURL(URLConvertible)
+        case invalidURL(API.URLConvertible)
     }
     
     public enum Decoding: Swift.Error, Sendable {

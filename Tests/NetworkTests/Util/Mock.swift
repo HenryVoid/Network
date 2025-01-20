@@ -16,7 +16,7 @@ enum Mock {
     }
     
     struct Endpoint: API.Endpoint {
-        var baseURL: URLConvertible = "https://www.naver.com"
+        var baseURL: API.URLConvertible = "https://www.naver.com"
         var path: String? = nil
         var method: API.HTTPMethod = .get
         var parameters: API.Parameters? = nil
