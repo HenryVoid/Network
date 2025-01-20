@@ -52,7 +52,17 @@ extension Data {
         String(decoding: self, as: UTF8.self)
     }
 
-    func asJSONObject() throws -> Any {
-        try JSONSerialization.jsonObject(with: self, options: .allowFragments)
+    func asJSONObject() throws -> NSObject {
+        try JSONSerialization.jsonObject(with: self, options: .allowFragments) as! NSObject
+    }
+}
+
+extension API.Parameters {
+    var asString: String {
+        self.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+    }
+    
+    var asNSObejct: NSObject {
+        self as NSObject
     }
 }

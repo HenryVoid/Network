@@ -24,7 +24,7 @@ struct JSONEncodingTests {
         let result = try encoder.encode(request: urlRequest, with: parameters)
         
         #expect(result.httpBody != nil)
-        #expect(try result.httpBody?.asJSONObject() as? NSObject == parameters as NSObject)
+        #expect(try result.httpBody?.asJSONObject() == parameters.asNSObejct)
     }
 
 }
