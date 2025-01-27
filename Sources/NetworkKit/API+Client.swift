@@ -18,12 +18,17 @@ extension API {
             self.monitor = monitor
             self.logger = logger
             self.interceptors = interceptors
+            
+            self.monitor?.connect()
+        }
+        
+        deinit {
+            self.monitor?.cancel()
         }
         
         @MainActor
         public func request<T: Decodable>(_ endpoint: API.Endpoint, decode: T.Type) async throws(API.Error) -> T {
             do {
-                monitor?.connect()
                 if let monitor,
                    await !monitor.isConnected() {
                     throw API.Error.connection(.failed)
@@ -32,22 +37,15 @@ extension API {
                 logger?.request(urlRequest)
                 let response: API.Response = try await fetch(with: urlRequest)
                 logger?.response(response: response)
-                monitor?.cancel()
                 return try makeResult(response)
             } catch let error as API.Error {
                 logger?.response(error: error)
-                monitor?.cancel()
                 throw error
             } catch {
                 logger?.response(error: error)
-                monitor?.cancel()
                 throw .unknown
             }
         }
-        
-//        public func upload<T>(_ endpoint: any Endpoint, decode: T.Type) async throws -> T where T : Decodable {
-//
-//        }
     }
 }
 
