@@ -17,6 +17,9 @@ extension API.Error {
         case missingURL
         case invalidJSON
         case jsonEncodingFailed
+        case missingUploadData
+        case emptyData
+        case invalidEncoding
     }
     
     public enum Configuration: Swift.Error, Sendable {
@@ -30,6 +33,8 @@ extension API.Error {
     
     public enum Session: Swift.Error, Sendable {
         case failedDataRequest
+        case uploadFailed
+        case timeoutError
     }
     
     public enum Response: Swift.Error, Sendable {
